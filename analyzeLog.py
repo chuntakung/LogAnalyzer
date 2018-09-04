@@ -7,12 +7,15 @@ Created on Tue Jul 24 22:20:58 2018
 DATE        INITIAL     CONTENTS
 ===============================================================================
 20180822    ck          initial version
+20180903    ck          added db time constraints, rowcount display,
+                        datetime inclusion
 """
 
 
 import mysql.connector
 from mysql.connector import errorcode
-import datetime
+from datetime import datetime
+from datetime import timedelta
 import utils
 import pandas as pd
 import time
@@ -44,36 +47,39 @@ else:
 # download data of interest from db
 #==============================================================================
 db = "sumodb"
-tb = "`00:00:c0:0b:71:bd`"
-limit = 500
-query = "SELECT raw,sourcecategory FROM {0}.{1} LIMIT {2}".format(db,tb,limit)
+tb = "`00:14:ee:0c:6e:f2`"
+since_day = (datetime.today().date()-timedelta(days=1)).strftime("'%Y-%m-%d'")
+since = "'2018-8-31'"
+limit = 500000
+query = "SELECT raw,sourcecategory,mtime FROM {0}.{1} where mtime >= {2}".format(db,tb, since)
 print (logtag + "trying to query with command:\t"+ query)
 
 cursor.execute(query)
+query_ret = cursor.fetchall()
+
+print (logtag + "%d rows returned from database" % (cursor.rowcount))
 
 #==============================================================================
 # parse message time and content
 # store into data structure pandas.dataframe
 #==============================================================================
-msg_stat = utils.MsgStats()
 parsing_start = time.clock()
 
 date_position_end = 10
 time_position_end = 23
-column_name = ['date', 'time', 'category', 'message']
-msgls = [] # [[date, time, category, msg], ...]
-for line in cursor:
-    msg_datetime_str = line[0][0:time_position_end]
-    msg_date_time = datetime.datetime.strptime(msg_datetime_str,"%Y-%m-%dT%H:%M:%S.%f")
+column_name = ['data-time', 'date', 'time', 'category', 'message']
+msgls = [] # [[datatime, date, time, category, msg], ...]
+for line in query_ret:
+    msg_date_time = line[2]
     msgdate = msg_date_time.date()
     msgtime = msg_date_time.time()
     msg = utils.extract_content(line[0][time_position_end+1:])
-    msgls.append([msgdate, msgtime, line[1], msg])
-msgdf = pd.DataFrame(msgls, columns=column_name)
-msg_stat = msg
+    msgls.append([msg_date_time, msgdate, msgtime, line[1], msg])
+msg_stat = utils.MsgStats(msgls)
+#msg_stat.print_msg()
 
 parsing_end = time.clock()
-print "time elapsed for parsing" + str(parsing_end - parsing_start)
+print "time elapsed for parsing " + str(parsing_end - parsing_start)
 
 
 
