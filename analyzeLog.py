@@ -37,7 +37,7 @@ except mysql.connector.Error as err: # catching "mysql.connector.Error" exceptio
   elif err.errno == errorcode.ER_BAD_DB_ERROR:
     print("Database does not exist")
   else:
-    print err
+    print(err)
 else:
   print(logtag+"Connected to sumodb successfully")
   cursor = cnx.cursor()
@@ -76,6 +76,7 @@ for line in query_ret:
     msg = utils.extract_content(line[0][time_position_end+1:])
     msgls.append([msg_date_time, msgdate, msgtime, line[1], msg])
 msg_stat = utils.MsgStats(msgls)
+msg_stat.plot_disconnection()
 #msg_stat.print_msg()
 
 parsing_end = time.clock()
