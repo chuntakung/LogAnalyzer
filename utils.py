@@ -10,9 +10,7 @@ DATE        INITIAL     CONTENTS
 20180903    ck          added extraction of RTW layer disconnection events
 """
 
-import plotly
-import plotly.plotly as py
-import plotly.graph_objs as go
+import matplotlib.pyplot as plt
 
 #==============================================================================
 # function to extract message content
@@ -37,8 +35,6 @@ class MsgStats:
     MSG_COL = 4
 
     def __init__(self, msgls):
-
-        plotly.tools.set_credentials_file(username='chuntakung', api_key='bEecqEVf7mXmdWQJr75g')
 
         # statistical counts
         self.disconnection_events = 0
@@ -79,20 +75,35 @@ class MsgStats:
                 ("Start to Connection" in obj[MsgStats.MSG_COL]):
                 print("{0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
                 self.rtw_connection_evt.append({'index':i, 'connection_status':1})
+                
+        self.rtw_connection_evt.sort(key=lambda x: x['index'])
 
     def print_msg(self):
         print(self.msg_list)
 
     def plot_disconnection(self):
         x = [ x[0] for x in self.msg_list ]
-        y = [0]* len(x)
-        for i, x in enumerate(self.msg_list):
-            if i in self.rtw_connection_evt:
-                y[i] = 0
-            elif i in self.rtw_connection_evt:
-                y[i] = 1
-        data = [go.Scatter(x=x, y=y)]
-        fig = go.Figure(data=data)
-        py.iplot(fig)
+        y = None
+        for i, item in self.rtw_connection_evt:
+            # interpolation
+            if y != None:
+                y = y + y[-1]*(i-len(y))
+            
+            if item['connection_status'] == 0:
+                # initialize
+                if y == None:
+                    y = [1]*i
+
+                # appened latest status
+                y.append(0)
+            else:
+                # initialize
+                if y == None:
+                    y = [0]*i # TODO: check upper later message to determine 
+                
+                # appened latest status
+                y.append(1)
+        
+        plt.plot(x, y,'-')
 
 

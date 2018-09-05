@@ -11,13 +11,11 @@ DATE        INITIAL     CONTENTS
                         datetime inclusion
 """
 
-
 import mysql.connector
 from mysql.connector import errorcode
 from datetime import datetime
 from datetime import timedelta
 import utils
-import pandas as pd
 import time
 
 
