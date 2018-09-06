@@ -78,7 +78,7 @@ msg_stat.plot_disconnection()
 #msg_stat.print_msg()
 
 parsing_end = time.clock()
-print "time elapsed for parsing " + str(parsing_end - parsing_start)
+print ("time elapsed for parsing " + str(parsing_end - parsing_start))
 
 
 

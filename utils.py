@@ -68,12 +68,12 @@ class MsgStats:
                 ("cfg80211_rtw_disconnect(wlan0)" in obj[MsgStats.MSG_COL]) or \
                 ("rtw_cfg80211_indicate_disconnect" in obj[MsgStats.MSG_COL]) or \
                 ("Start to Disconnect" in obj[MsgStats.MSG_COL]):
-                print("{0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
                 self.rtw_connection_evt.append({'index':i, 'connection_status':0})
             elif ("cfg80211_rtw_connect(wlan0)" in obj[MsgStats.MSG_COL]) or \
                 ("rtw_cfg80211_indicate_connect" in obj[MsgStats.MSG_COL]) or \
                 ("Start to Connection" in obj[MsgStats.MSG_COL]):
-                print("{0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
                 self.rtw_connection_evt.append({'index':i, 'connection_status':1})
                 
         self.rtw_connection_evt.sort(key=lambda x: x['index'])
@@ -84,26 +84,38 @@ class MsgStats:
     def plot_disconnection(self):
         x = [ x[0] for x in self.msg_list ]
         y = None
-        for i, item in self.rtw_connection_evt:
+        for i, item in enumerate(self.rtw_connection_evt):
+            print("dbg: {0} {1}".format(i, item))
             # interpolation
             if y != None:
-                y = y + y[-1]*(i-len(y))
+                y = y + [y[-1]]*(item['index']-len(y))
             
             if item['connection_status'] == 0:
                 # initialize
                 if y == None:
-                    y = [1]*i
+                    y = [1]*item['index']
 
                 # appened latest status
                 y.append(0)
             else:
                 # initialize
                 if y == None:
-                    y = [0]*i # TODO: check upper later message to determine 
+                    y = [0]*item['index'] # TODO: check upper later message to determine 
                 
                 # appened latest status
                 y.append(1)
         
-        plt.plot(x, y,'-')
+        # padding to end 
+        y = y + [y[-1]]*(len(x)-len(y))
+        
+        # plotting
+        fig = plt.plot(x, y,'r', lw=2)
+        plt.ylim(-0.5, 1.5)
+        for i, item in enumerate(self.rtw_connection_evt):
+            if item['connection_status'] == 0:
+                plt.annotate('disconnected', xy=(x[item['index']],0), xytext=(x[item['index']], 1.2))
+        
+        plt.show()
+        
 
 
