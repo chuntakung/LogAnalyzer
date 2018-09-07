@@ -11,13 +11,11 @@ DATE        INITIAL     CONTENTS
                         datetime inclusion
 """
 
-
 import mysql.connector
 from mysql.connector import errorcode
 from datetime import datetime
 from datetime import timedelta
 import utils
-import pandas as pd
 import time
 
 
@@ -37,7 +35,7 @@ except mysql.connector.Error as err: # catching "mysql.connector.Error" exceptio
   elif err.errno == errorcode.ER_BAD_DB_ERROR:
     print("Database does not exist")
   else:
-    print err
+    print(err)
 else:
   print(logtag+"Connected to sumodb successfully")
   cursor = cnx.cursor()
@@ -50,8 +48,8 @@ db = "sumodb"
 tb = "`00:14:ee:0c:6e:f2`"
 since_day = (datetime.today().date()-timedelta(days=1)).strftime("'%Y-%m-%d'")
 since = "'2018-8-31'"
-limit = 500000
-query = "SELECT raw,sourcecategory,mtime FROM {0}.{1} where mtime >= {2}".format(db,tb, since)
+limit = 10000
+query = "SELECT raw,sourcecategory,mtime FROM {0}.{1} where mtime >= {2} limit {3}".format(db,tb, since, limit)
 print (logtag + "trying to query with command:\t"+ query)
 
 cursor.execute(query)
@@ -76,10 +74,11 @@ for line in query_ret:
     msg = utils.extract_content(line[0][time_position_end+1:])
     msgls.append([msg_date_time, msgdate, msgtime, line[1], msg])
 msg_stat = utils.MsgStats(msgls)
+msg_stat.plot_disconnection_plotly()
 #msg_stat.print_msg()
 
 parsing_end = time.clock()
-print "time elapsed for parsing " + str(parsing_end - parsing_start)
+print ("time elapsed for parsing " + str(parsing_end - parsing_start))
 
 
 
