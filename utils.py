@@ -13,6 +13,8 @@ DATE        INITIAL     CONTENTS
 
 import plotly
 import plotly.plotly as py
+import plotly.offline as po
+po.init_notebook_mode(connected=True)
 import plotly.graph_objs as go
 import matplotlib.pyplot as plt
 
@@ -53,9 +55,12 @@ class MsgStats:
 
         # disconnection periods
         self.rtw_connection_evt = []
-        self.wpas_disconnections = []
-        self.WSM_disconnections = []
-        self.restSDK_disconnections = []
+        self.wpas_connection_evt = []
+        self.wsm_connection_evt = []
+        self.restSDK_connection_evt = []
+        self.dhcp_failure_evt = []
+        self.ifdu_evt = []
+        self.cannot_ping_gateway_evt = []
         self.parse_disconnections()
 
     def count_disconnection(self):
@@ -81,16 +86,50 @@ class MsgStats:
                 ("Start to Connection" in obj[MsgStats.MSG_COL]):
                 print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
                 self.rtw_connection_evt.append({'index':i, 'connection_status':1})
+            elif ("CTRL-EVENT-DISCONNECTED" in obj[MsgStats.MSG_COL]):
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                self.wpas_connection_evt.append({'index':i, 'connection_status':0})
+            elif ("CTRL-EVENT-CONNECTED" in obj[MsgStats.MSG_COL]):
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                self.wpas_connection_evt.append({'index':i, 'connection_status':1})
+            elif ("processMsg: DisconnectedState" in obj[MsgStats.MSG_COL]) or \
+                ("new state=DISCONNECTED" in obj[MsgStats.MSG_COL]):
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                self.wsm_connection_evt.append({'index':i, 'connection_status':0})
+            elif ("processMsg: ConnectedState" in obj[MsgStats.MSG_COL]) or \
+                ("new state=CONNECTED" in obj[MsgStats.MSG_COL]):
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                self.wsm_connection_evt.append({'index':i, 'connection_status':1})
+            elif ("wifi disconnected" in obj[MsgStats.MSG_COL] and \
+                "restsdk" in obj[MsgStats.MSG_COL]):
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                self.restSDK_connection_evt.append({'index':i, 'connection_status':0})
+            elif ("wifi connected" in obj[MsgStats.MSG_COL] and \
+                "restsdk" in obj[MsgStats.MSG_COL]):
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                self.restSDK_connection_evt.append({'index':i, 'connection_status':1})
+            elif "DHCP FAILURE" in obj[MsgStats.MSG_COL]:
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                self.dhcp_failure_evt.append({'index':i})
+            elif "Starting service 'ifdu(0)" in obj[MsgStats.MSG_COL]:
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                self.ifdu_evt.append({'index':i})
+            elif "Cannot ping gateway" in obj[MsgStats.MSG_COL]:
+                print("dbg: {0} ==> {1}".format(i, obj[MsgStats.MSG_COL]))
+                self.cannot_ping_gateway_evt.append({'index':i})
 
         self.rtw_connection_evt.sort(key=lambda x: x['index'])
+        self.wpas_connection_evt.sort(key=lambda x: x['index'])
+        self.wsm_connection_evt.sort(key=lambda x: x['index'])
+        self.restSDK_connection_evt.sort(key=lambda x: x['index'])
 
     def print_msg(self):
         print(self.msg_list)
 
-    def prepare_rtw_disconnection_xy(self):
+    def prepare_disconnection_xy(self, evt):
         x = [ x[0] for x in self.msg_list ]
         y = None
-        for i, item in enumerate(self.rtw_connection_evt):
+        for i, item in enumerate(evt):
             print("dbg: {0} {1}".format(i, item))
             # interpolation
             if y != None:
@@ -115,23 +154,59 @@ class MsgStats:
         y = y + [y[-1]]*(len(x)-len(y))
         return x,y
 
+    def prepare_rtw_disconnection_xy(self):
+        x = [ x[0] for x in self.msg_list ]
+        y = None
+        for i, item in enumerate(self.rtw_connection_evt):
+            print("dbg: {0} {1}".format(i, item))
+            # interpolation with the latest status
+            if y != None:
+                y = y + [y[-1]]*(item['index']-len(y))
 
-    def plot_disconnection(self):
+            if item['connection_status'] == 0:
+                # initialize with opposite one ?? maybe leave blank ?? 
+                if y == None:
+                    y = [1]*item['index']
+
+                # appened latest status
+                y.append(0)
+            else:
+                # initialize
+                if y == None:
+                    y = [0]*item['index'] # TODO: check upper later message to determine
+
+                # appened latest status
+                y.append(1)
+
+        # padding to end
+        y = y + [y[-1]]*(len(x)-len(y))
+        return x,y
+
+    def plot_disconnection_matplot(self):
         x,y = self.prepare_rtw_disconnection_xy()
-
         # plotting
         plt.plot(x, y,'r')
         plt.ylim(-0.5, 1.5)
         for i, item in enumerate(self.rtw_connection_evt):
             if item['connection_status'] == 0:
                 plt.annotate('disconnected', xy=(x[item['index']],0), xytext=(x[item['index']], 1.2))
-
         plt.show() # does not matter when in interactive mode
 
     def plot_disconnection_plotly(self):
         x,y = self.prepare_rtw_disconnection_xy()
         data = [go.Scatter(x=x, y=y)]
         fig = go.Figure(data=data)
-        py.plot(fig)
+        po.plot(fig, filename='disconnection.html')
 
+    def plot_disconnection_plotly_jupyter(self):
+        x,y = self.prepare_rtw_disconnection_xy()
+        data = [go.Scatter(x=x, y=y)]
+        fig = go.Figure(data=data)
+        # plot in jupyter notebook
+        po.iplot(fig, filename='disconnection.html')
 
+    def plot_disconnection_plotly_online(self):
+        x,y = self.prepare_rtw_disconnection_xy()
+        data = [go.Scatter(x=x, y=y)]
+        fig = go.Figure(data=data)
+        py.plot(fig, filename='disconnection.html')
