@@ -9,6 +9,7 @@ DATE        INITIAL     CONTENTS
 20180822    ck          initial version
 20180903    ck          added extraction of RTW layer disconnection events
 20180907    ck          plotting of rtw disconnection using plotly and matplotpy
+20180917    ck          added plots and annotations in all layers
 """
 
 import plotly
@@ -62,7 +63,8 @@ class MsgStats:
         self.ifdu_evt = []
         self.cannot_ping_gateway_evt = []
         self.parse_disconnections()
-
+        self.evt_types = ['rtw', 'wpa_supplicant', 'WifiStateMachine', 'restsdk']
+    
     def count_disconnection(self):
         self.disconnection_events += 1
 
@@ -123,36 +125,53 @@ class MsgStats:
         self.wsm_connection_evt.sort(key=lambda x: x['index'])
         self.restSDK_connection_evt.sort(key=lambda x: x['index'])
 
-    def print_msg(self):
-        print(self.msg_list)
 
     def prepare_disconnection_xy(self, evt):
         x = [ x[0] for x in self.msg_list ]
-        y = None
+        y = []
         for i, item in enumerate(evt):
             print("dbg: {0} {1}".format(i, item))
             # interpolation
-            if y != None:
+            if len(y) > 0:
                 y = y + [y[-1]]*(item['index']-len(y))
 
             if item['connection_status'] == 0:
                 # initialize
-                if y == None:
+                if len(y) == 0:
                     y = [1]*item['index']
 
                 # appened latest status
                 y.append(0)
             else:
                 # initialize
-                if y == None:
+                if len(y) == 0:
                     y = [0]*item['index'] # TODO: check upper later message to determine
 
                 # appened latest status
                 y.append(1)
 
         # padding to end
-        y = y + [y[-1]]*(len(x)-len(y))
-        return x,y
+        if len(y) > 0:
+            y = y + [y[-1]]*(len(x)-len(y))
+            return x,y,True
+        else:
+            return x,y,False
+
+    def get_all_disconnection_xy_in_list(self, evt_types):
+        events = []
+        for item in evt_types:
+            if item == 'rtw':
+                events.append(self.rtw_connection_evt)
+            elif item == 'wpa_supplicant':
+                events.append(self.wpas_connection_evt)
+            if item == 'WifiStateMachine':
+                events.append(self.wsm_connection_evt)
+            if item == 'restsdk':
+                events.append(self.restSDK_connection_evt)                
+        all_disc_xy = []
+        for item in events:
+            all_disc_xy.append(self.prepare_disconnection_xy(item))            
+        return all_disc_xy
 
     def prepare_rtw_disconnection_xy(self):
         x = [ x[0] for x in self.msg_list ]
@@ -193,9 +212,17 @@ class MsgStats:
         plt.show() # does not matter when in interactive mode
 
     def plot_disconnection_plotly(self):
-        x,y = self.prepare_rtw_disconnection_xy()
-        data = [go.Scatter(x=x, y=y)]
-        fig = go.Figure(data=data)
+        xy_list = self.get_all_disconnection_xy_in_list(self.evt_types)
+        trace_list = []
+        evt_name = []
+        for i, item in enumerate(xy_list):
+            if item[2] == True:
+                trace_list.append(go.Scatter(x = item[0], y = item[1]))            
+                evt_name.append(self.evt_types[i])
+        fig = plotly.tools.make_subplots(rows = len(trace_list), cols = 1, subplot_titles = evt_name)
+        for i, tr in enumerate(trace_list):
+            fig.append_trace(tr, i+1, 1)
+            fig['layout']['xaxis{0}'.format(i)].update(title='time')            
         po.plot(fig, filename='disconnection.html')
 
     def plot_disconnection_plotly_jupyter(self):
